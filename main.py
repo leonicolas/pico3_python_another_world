@@ -87,7 +87,7 @@ def main():
             print("Use terminal mode instead (remove --pico3).")
             return
 
-        display = Pico3Display(scale=2)
+        display = Pico3Display()
         inp = Pico3Input()
         timer = UnixTimer()
 
