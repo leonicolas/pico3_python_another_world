@@ -22,10 +22,12 @@ Controls:
     N: step one frame while paused (debug mode)
 """
 
+import os
 import sys
 
-
 def main():
+    init()
+
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = [a for a in sys.argv[1:] if a.startswith("--")]
 
@@ -35,10 +37,11 @@ def main():
         print("\ndata_dir: path to game data files")
         print("password: 4-letter checkpoint code (e.g. LDKD, HTDC, CLLD)")
         print("part_id:  numeric starting part (default: title screen)")
-        print("--sdl:   SDL2 window (recommended)")
+        print("--pico3: Pico 3 graphics (recommended)")
+        print("--sdl:   SDL2 window")
         print("--debug: frame counter, P to pause, N to step")
         print("\nRun 'python3 tools/passwords.py' to see all checkpoint codes")
-        sys.exit(1)
+        return
 
     data_dir = args[0]
     part_id = None          # None → show title screen
@@ -52,11 +55,12 @@ def main():
             if pw not in PASSWORDS:
                 print("Unknown password: {}".format(arg))
                 print("Run 'python3 tools/passwords.py' to see valid codes")
-                sys.exit(1)
+                return
             checkpoint, part_id = PASSWORDS[pw]
         else:
             part_id = int(arg)
 
+    use_pico3 = "--pico3" in flags
     use_sdl = "--sdl" in flags
     debug = "--debug" in flags
     skip_title = "--no-title" in flags
@@ -72,7 +76,22 @@ def main():
     from aw.engine import Engine
     from hal_unix.file_unix import UnixFile
 
-    if use_sdl:
+    if use_pico3:
+        try:
+            from hal_pico3.pico3_display import Pico3Display
+            from hal_pico3.pico3_input import Pico3Input
+            from hal_unix.timer_unix import UnixTimer
+        except ImportError as e:
+            print("Error:", e)
+            print("Requires Pico3 hardware")
+            print("Use terminal mode instead (remove --pico3).")
+            return
+
+        display = Pico3Display(scale=2)
+        inp = Pico3Input()
+        timer = UnixTimer()
+
+    elif use_sdl:
         try:
             from hal_unix.sdl2_display import SDL2Display
             from hal_unix.sdl2_input import SDL2Input
@@ -80,7 +99,7 @@ def main():
         except ImportError:
             print("SDL2 backend requires CPython with ctypes and libSDL2.")
             print("Use terminal mode instead (remove --sdl).")
-            sys.exit(1)
+            return
 
         display = SDL2Display(scale=3)
         inp = SDL2Input(display)
@@ -122,6 +141,14 @@ def main():
         inp.shutdown()
         display.shutdown()
 
+def init():
+    # Add the script directory to sys.path so that we can import other modules
+    script_dir = __file__.rsplit("/", 1)[0] if "/" in __file__ else ""
+    if not script_dir.startswith("/"):
+        cwd = os.getcwd()
+        script_dir = cwd if not script_dir else cwd.rstrip("/") + "/" + script_dir
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
 
 if __name__ == "__main__":
     main()
